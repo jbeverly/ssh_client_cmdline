@@ -1,0 +1,31 @@
+#!/usr/bin/env python
+from ssh_client_cmdline.SSH_CmdlineParsing import *
+import sys
+import pwd
+import os
+import shlex
+
+suffixes = []
+ent = pwd.getpwuid(os.getuid())
+try:
+    suffix_fd = open(os.path.join(ent.pw_dir, '.resolver_suffixes'), 'r')
+    suffixes = [ x.strip() for x in suffix_fd.readlines() ]
+except IOError:
+    pass
+
+if os.environ.get('SSH_COMMAND_LINE'):
+    cmdline = shlex.split(os.environ.get('SSH_COMMAND_LINE'), posix=True) + sys.argv[1:]
+else:
+    cmdline = sys.argv[1:]
+
+try:
+    for cls in [ SSH_ResolveFQDN, SSH_LocalPortForwardFQDN, SSH_RemotePortForwardFQDN ]:
+        cmdline = cls(cmdline, suffixes=suffixes, reverse=True, longest=True).cmdline
+except Exception as E:
+    sys.stderr.write( str(E) + "\n")
+    sys.exit(1)
+
+#sys.stderr.write(' '.join(cmdline) + "\n")
+ssh = SSH_CmdlineParsing(cmdline)
+sys.stderr.write('Connecting to %s...\n' % ssh.hostname)
+ssh.exec_ssh()
